@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../types';
 import { requireUser } from '../middleware/user';
+import { rateLimit, LLM_LIMITS } from '../middleware/rate-limit';
 import {
   callLlm,
   imageBlockFromBuffer,
@@ -30,7 +31,7 @@ A typical American front yard is 1,500–4,000 sq ft. A typical full residential
 
 // POST /api/estimate-size
 // Multipart with one or more `file` fields. Returns { size_sqft, confidence, reasoning }.
-estimate.post('/', async (c) => {
+estimate.post('/', rateLimit(LLM_LIMITS), async (c) => {
   const form = await c.req.parseBody({ all: true }).catch(() => null);
   if (!form) return c.json({ error: 'expected multipart/form-data' }, 400);
 

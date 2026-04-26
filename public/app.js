@@ -658,18 +658,64 @@ async function loadPhotos() {
 
 // ---------- Notifications ----------
 
+function formatRelativeFuture(unixSec) {
+  const now = Date.now() / 1000;
+  const diffDays = Math.round((unixSec - now) / 86400);
+  if (diffDays <= 0) return 'today';
+  if (diffDays === 1) return 'tomorrow';
+  if (diffDays < 14) return `in ${diffDays} days`;
+  if (diffDays < 60) return `in ${Math.round(diffDays / 7)} weeks`;
+  return `in ~${Math.round(diffDays / 30)} months`;
+}
+
+function formatAbsolute(unixSec) {
+  return new Date(unixSec * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 async function loadNotifications() {
   if (!state.currentLawnId) return;
-  const list = $('#notification-list');
-  list.innerHTML = '';
+  const recentList = $('#notification-list');
+  const upcomingList = $('#notif-upcoming-list');
+  const upcomingSection = $('#notif-upcoming-section');
+  const planning = $('#notif-planning');
+  recentList.innerHTML = '';
+  upcomingList.innerHTML = '';
+
   try {
-    const { notifications } = await api(`/api/lawns/${state.currentLawnId}/notifications`);
-    const unread = notifications.filter((n) => !n.read_at);
+    const { upcoming = [], recent = [] } = await api(`/api/lawns/${state.currentLawnId}/notifications`);
+
+    // Unread badge counts only items the user hasn't seen yet (not previews).
+    const unread = recent.filter((n) => !n.read_at);
     const badge = $('#notif-badge');
     if (unread.length) { badge.hidden = false; badge.textContent = unread.length; }
     else { badge.hidden = true; }
-    $('#notification-empty').hidden = notifications.length > 0;
-    for (const n of notifications) {
+
+    // Upcoming section
+    upcomingSection.hidden = upcoming.length === 0;
+    for (const n of upcoming) {
+      const item = document.createElement('div');
+      item.className = 'notification upcoming';
+      item.innerHTML = `
+        <div class="when"></div>
+        <h3></h3>
+        <div class="body"></div>
+        <div class="meta"></div>
+      `;
+      item.querySelector('h3').textContent = n.title;
+      item.querySelector('.body').textContent = n.body;
+      item.querySelector('.when').textContent =
+        `${formatRelativeFuture(n.scheduled_for)} · ${formatAbsolute(n.scheduled_for)}`;
+      item.querySelector('.meta').textContent = `${n.type} · scheduled`;
+      upcomingList.appendChild(item);
+    }
+
+    // Recent section
+    $('#notification-empty').hidden = recent.length > 0 || upcoming.length > 0;
+    if (recent.length === 0 && upcoming.length > 0) {
+      // We have a plan but nothing has fired yet — soften the empty copy.
+      $('#notification-empty').hidden = true;
+    }
+    for (const n of recent) {
       const item = document.createElement('div');
       item.className = `notification ${n.read_at ? '' : 'unread'}`;
       item.innerHTML = `
@@ -680,7 +726,7 @@ async function loadNotifications() {
       item.querySelector('h3').textContent = n.title;
       item.querySelector('.body').textContent = n.body;
       item.querySelector('.meta').textContent =
-        `${n.type} • ${new Date(n.sent_at * 1000).toLocaleDateString()}`;
+        `${n.type} · ${new Date(n.sent_at * 1000).toLocaleDateString()}`;
       if (!n.read_at) {
         item.style.cursor = 'pointer';
         item.addEventListener('click', async () => {
@@ -688,10 +734,20 @@ async function loadNotifications() {
           loadNotifications();
         });
       }
-      list.appendChild(item);
+      recentList.appendChild(item);
+    }
+
+    // Drafting indicator: brand new lawn, plan hasn't landed yet.
+    const lawn = state.lawns.find((l) => l.id === state.currentLawnId);
+    const ageSeconds = lawn ? Date.now() / 1000 - lawn.created_at : Infinity;
+    const planning_visible = upcoming.length === 0 && recent.length === 0 && ageSeconds < 60;
+    planning.hidden = !planning_visible;
+    if (planning_visible) {
+      // Re-poll once for the freshly-generated plan.
+      setTimeout(loadNotifications, 4000);
     }
   } catch (err) {
-    list.innerHTML = `<p class="muted">Failed: ${err.message}</p>`;
+    recentList.innerHTML = `<p class="muted">Failed: ${err.message}</p>`;
   }
 }
 

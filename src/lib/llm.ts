@@ -24,12 +24,29 @@ const CHEMICAL_KEYWORDS = [
 const DISCLAIMER =
   '_Lawn Buddy is not a licensed professional. Always read product labels and follow local regulations. Keep pets and children off treated areas per the label. If unsure, consult a licensed applicator._';
 
+// Marker that uniquely identifies an already-appended disclaimer block. Used
+// to keep maybeAppendDisclaimer idempotent and to strip it from history before
+// re-feeding to the LLM.
+const DISCLAIMER_MARKER = 'Lawn Buddy is not a licensed professional';
+
 export function maybeAppendDisclaimer(content: string): string {
+  if (content.includes(DISCLAIMER_MARKER)) return content;
   const lower = content.toLowerCase();
   if (CHEMICAL_KEYWORDS.some((k) => lower.includes(k))) {
     return `${content}\n\n---\n${DISCLAIMER}`;
   }
   return content;
+}
+
+// Remove any platform-appended disclaimer (and its preceding rule) from a
+// historical assistant message before feeding it back to the LLM. Prevents
+// the model from copying the pattern and emitting its own disclaimer.
+export function stripDisclaimer(content: string): string {
+  const idx = content.indexOf(DISCLAIMER_MARKER);
+  if (idx === -1) return content;
+  // Walk back to the start of the disclaimer block, eating the leading rule
+  // ("\n\n---\n_") and any whitespace.
+  return content.slice(0, idx).replace(/\n*-{3,}\s*\n*_?\s*$/, '').trimEnd();
 }
 
 export function buildSystemPrompt(lawn: LawnRow, now: Date = new Date()): string {
@@ -57,6 +74,8 @@ export function buildSystemPrompt(lawn: LawnRow, now: Date = new Date()): string
     '- When recommending products or chemicals, name an active ingredient and give a rate per 1000 sq ft.',
     '- If a question requires information you don\'t have (recent soil test, photo of the issue, etc.), ask for it before guessing.',
     '- Avoid generic advice that could apply to any lawn.',
+    '- Only reference photos when one is actually attached to the current user message. If no photo is attached, reason from the profile and conversation only — do not invent or assume visual details.',
+    '- Do not append legal or safety disclaimers, license warnings, or "consult a professional" boilerplate. The platform adds those automatically when relevant.',
     '',
     `Lawn profile — name: ${lawn.name}`,
   ];
@@ -126,6 +145,8 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
 }
 
 // Convert a stored message row into a ChatMessage, attaching any referenced photos.
+// Assistant messages have any platform-appended disclaimer stripped so the model
+// doesn't see the pattern and reproduce it in its next reply.
 export async function rowToChatMessage(
   env: Env,
   row: MessageRow,
@@ -139,7 +160,8 @@ export async function rowToChatMessage(
     const block = await buildImageBlock(env, key);
     if (block) blocks.push(block);
   }
-  if (row.content) blocks.push({ type: 'text', text: row.content });
+  const text = row.role === 'assistant' ? stripDisclaimer(row.content) : row.content;
+  if (text) blocks.push({ type: 'text', text });
   if (blocks.length === 0) blocks.push({ type: 'text', text: '(empty)' });
   return { role: row.role, content: blocks };
 }
@@ -194,13 +216,28 @@ export async function callLlm(
   }
   const data = (await res.json()) as {
     choices?: Array<{
-      message?: { content?: string };
+      message?: { content?: unknown };
       finish_reason?: string;
     }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
 
-  const text = data.choices?.[0]?.message?.content ?? '';
+  // Cloudflare's compat layer can return message.content in three shapes:
+  //   - string (default text output)
+  //   - array of typed blocks: [{ type: 'text', text: '...' }]
+  //   - object (pre-parsed JSON, when the model produced valid JSON)
+  // Normalize to a string so downstream code (stripJsonFence, JSON.parse) works.
+  const rawContent: unknown = data.choices?.[0]?.message?.content;
+  let text = '';
+  if (typeof rawContent === 'string') {
+    text = rawContent;
+  } else if (Array.isArray(rawContent)) {
+    text = rawContent
+      .map((b: any) => (b && typeof b.text === 'string' ? b.text : ''))
+      .join('');
+  } else if (rawContent && typeof rawContent === 'object') {
+    text = JSON.stringify(rawContent);
+  }
   return {
     content: text.trim(),
     finishReason: data.choices?.[0]?.finish_reason ?? null,

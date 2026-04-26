@@ -974,7 +974,55 @@ button.danger.link:hover { background: transparent; color: var(--ember); border-
 
 /* --------------------------- notifications ----------------------------- */
 
-#notification-list {
+.notif-section { margin-bottom: 36px; }
+.notif-section:last-child { margin-bottom: 0; }
+
+.notif-section-title {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 144, 'wght' 440, 'SOFT' 30;
+  font-size: 26px;
+  margin: 0 0 6px;
+  letter-spacing: -0.012em;
+}
+.notif-section-title::before {
+  content: '';
+  display: inline-block;
+  width: 22px;
+  height: 1px;
+  background: var(--clay);
+  vertical-align: middle;
+  margin-right: 12px;
+}
+
+.notif-section-lede {
+  font-family: var(--display);
+  font-style: italic;
+  font-variation-settings: 'opsz' 144, 'wght' 380, 'SOFT' 100;
+  font-size: 16px;
+  color: var(--ink-soft);
+  margin: 0 0 22px;
+  max-width: 60ch;
+}
+
+#notif-planning {
+  font-family: var(--display);
+  font-style: italic;
+  color: var(--faded);
+  font-size: 17px;
+  text-align: center;
+  padding: 24px 0;
+  font-variation-settings: 'opsz' 144, 'wght' 380, 'SOFT' 100;
+}
+#notif-planning::before {
+  content: '✻ ';
+  color: var(--clay);
+  font-style: normal;
+  display: inline-block;
+  animation: spin 3s linear infinite;
+}
+
+#notification-list,
+#notif-upcoming-list {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1009,6 +1057,55 @@ button.danger.link:hover { background: transparent; color: var(--ember); border-
 }
 #notification-list .notification.unread:hover {
   transform: translateX(2px);
+}
+
+#notif-upcoming-list .notification {
+  background: var(--surface-warm);
+  border: 1px dashed var(--rule);
+  padding: 20px 24px 22px;
+  position: relative;
+  border-left: 3px solid var(--sage);
+  padding-left: 26px;
+}
+#notif-upcoming-list .notification .when {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--moss);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#notif-upcoming-list .notification .when::before {
+  content: '◆';
+  color: var(--clay);
+  font-size: 8px;
+}
+#notif-upcoming-list .notification h3 {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 144, 'wght' 460, 'SOFT' 30;
+  font-size: 21px;
+  margin: 0 0 6px;
+  letter-spacing: -0.008em;
+  color: var(--ink);
+}
+#notif-upcoming-list .notification .body {
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin: 0;
+  line-height: 1.55;
+}
+#notif-upcoming-list .notification .meta {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--faded);
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--rule);
 }
 
 #notification-list .notification h3 {

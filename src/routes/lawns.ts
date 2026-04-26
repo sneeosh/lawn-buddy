@@ -3,6 +3,8 @@ import type { AppContext, LawnRow } from '../types';
 import { requireUser } from '../middleware/user';
 import { newId } from '../lib/id';
 import { validateIntake, validateSoilTest, validateClimateZone } from '../lib/validate';
+import { generatePlan } from '../lib/plan';
+import { rateLimit, LLM_LIMITS } from '../middleware/rate-limit';
 
 const lawns = new Hono<AppContext>();
 
@@ -30,7 +32,7 @@ lawns.get('/', async (c) => {
   return c.json({ lawns: (result.results ?? []).map(rowToLawn) });
 });
 
-lawns.post('/', async (c) => {
+lawns.post('/', rateLimit(LLM_LIMITS), async (c) => {
   const email = c.get('userEmail');
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return c.json({ error: 'invalid JSON body' }, 400);
@@ -66,6 +68,18 @@ lawns.post('/', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM lawns WHERE id = ?')
     .bind(id)
     .first<LawnRow>();
+
+  // Kick off LLM-driven 6-month plan generation in the background. The user
+  // gets their lawn back immediately; the upcoming notifications populate the
+  // Notifications tab a few seconds later.
+  if (row) {
+    c.executionCtx.waitUntil(
+      generatePlan(c.env, row).catch((err) => {
+        console.error('background plan generation failed', err);
+      })
+    );
+  }
+
   return c.json({ lawn: rowToLawn(row!) }, 201);
 });
 

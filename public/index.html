@@ -186,8 +186,17 @@
       </div>
 
       <div class="tab-panel" id="tab-notifications" hidden>
-        <div id="notification-list"></div>
-        <p id="notification-empty" hidden>No dispatches yet. Seasonal notices arrive when their time comes.</p>
+        <section class="notif-section" id="notif-upcoming-section" hidden>
+          <h2 class="notif-section-title">Coming up</h2>
+          <p class="notif-section-lede">A 6-month plan tailored to this lawn. Each entry will arrive (and email) on its date.</p>
+          <div id="notif-upcoming-list"></div>
+        </section>
+        <section class="notif-section">
+          <h2 class="notif-section-title">Recent</h2>
+          <div id="notification-list"></div>
+          <p id="notification-empty" hidden>No dispatches yet. Seasonal notices arrive when their time comes.</p>
+        </section>
+        <p id="notif-planning" hidden>The almanac is drafting your plan…</p>
       </div>
 
       <div class="tab-panel" id="tab-details" hidden>

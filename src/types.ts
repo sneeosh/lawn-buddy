@@ -54,4 +54,6 @@ export type NotificationRow = {
   sent_at: number;
   read_at: number | null;
   dedup_key: string | null;
+  scheduled_for: number | null;
+  emailed_at: number | null;
 };

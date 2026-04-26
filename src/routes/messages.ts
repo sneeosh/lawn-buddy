@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { AppContext, LawnRow, MessageRow, PhotoRow } from '../types';
 import { requireUser } from '../middleware/user';
+import { rateLimit, LLM_LIMITS } from '../middleware/rate-limit';
 import { newId } from '../lib/id';
 import {
   buildSystemPrompt,
@@ -60,8 +61,8 @@ messages.get('/:lawnId/messages', async (c) => {
 // POST /api/lawns/:lawnId/messages
 // Body: { content: string, photo_ids?: string[] }
 // Appends user msg, calls LLM, persists assistant reply, returns both.
-messages.post('/:lawnId/messages', async (c) => {
-  const lawnId = c.req.param('lawnId');
+messages.post('/:lawnId/messages', rateLimit(LLM_LIMITS), async (c) => {
+  const lawnId = c.req.param('lawnId') as string;
   const lawn = await lawnOwnedByUser(c, lawnId);
   if (!lawn) return c.json({ error: 'lawn not found' }, 404);
 

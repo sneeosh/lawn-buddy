@@ -2,7 +2,7 @@
 // lawn profile + climate zone + 7-day weather forecast. Persist new ones, email,
 // and prune old chat history. Dedup'd via the `dedup_key` column on notifications.
 
-import type { Env, LawnRow } from '../types';
+import type { Env, LawnRow, NotificationRow } from '../types';
 import { getZone } from './zones';
 import { fetchWeatherForecast, summarizeForecast } from './weather';
 import { callLlmJson } from './llm';
@@ -94,7 +94,7 @@ export async function runDailyCron(env: Env, now: Date = new Date()): Promise<{
       for (const a of fresh) {
         const type = /frost|heat|rain|storm|snow|temp/i.test(a.dedup_key) ? 'weather' : 'seasonal';
         await env.DB.prepare(
-          'INSERT INTO notifications (id, lawn_id, type, title, body, dedup_key) VALUES (?, ?, ?, ?, ?, ?)'
+          'INSERT INTO notifications (id, lawn_id, type, title, body, dedup_key, emailed_at) VALUES (?, ?, ?, ?, ?, ?, unixepoch())'
         )
           .bind(newId(), lawn.id, type, a.title, a.body, a.dedup_key)
           .run();
@@ -120,7 +120,46 @@ export async function runDailyCron(env: Env, now: Date = new Date()): Promise<{
     }
   }
 
+  // Sweep: scheduled (preview) notifications whose date has passed but were
+  // never emailed. Group by lawn → one email per lawn per run.
+  const dueRes = await env.DB.prepare(
+    `SELECT * FROM notifications
+     WHERE scheduled_for IS NOT NULL
+       AND scheduled_for <= unixepoch()
+       AND emailed_at IS NULL`
+  ).all<NotificationRow>();
+  const dueByLawn = new Map<string, NotificationRow[]>();
+  for (const n of dueRes.results ?? []) {
+    if (!dueByLawn.has(n.lawn_id)) dueByLawn.set(n.lawn_id, []);
+    dueByLawn.get(n.lawn_id)!.push(n);
+  }
+
+  for (const [lawnId, items] of dueByLawn) {
+    const lawn = lawns.find((l) => l.id === lawnId);
+    if (!lawn) continue;
+    const subject =
+      items.length === 1
+        ? `Lawn Buddy: ${items[0]!.title}`
+        : `Lawn Buddy: ${items.length} updates for ${lawn.name}`;
+    const text = items.map((n) => `▸ ${n.title}\n${n.body}`).join('\n\n');
+    try {
+      await sendEmail(env, { to: lawn.user_email, subject, text });
+      for (const n of items) {
+        await env.DB.prepare('UPDATE notifications SET emailed_at = unixepoch() WHERE id = ?')
+          .bind(n.id)
+          .run();
+      }
+      emailsSent++;
+    } catch (err) {
+      console.error('scheduled email send failed for lawn', lawnId, err);
+      errors++;
+    }
+  }
+
   const messagesPruned = await pruneOldMessages(env);
+
+  // Drop rate-limit windows older than 7 days; the longest window we use is 1 day.
+  await env.DB.prepare('DELETE FROM rate_limits WHERE window_start < unixepoch() - 7 * 86400').run();
 
   return {
     lawnsProcessed: lawns.length,
