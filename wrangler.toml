@@ -1,19 +1,51 @@
 name = "lawn-buddy"
 main = "src/index.ts"
-compatibility_date = "2024-04-25"
-type = "service"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 
-# Cloudflare KV bindings (for lawn care data)
-# [[kv_namespaces]]
-# binding = "LAWN_BUDDY_KV"
-# id = "your-kv-namespace-id"
-# preview_id = "your-preview-kv-namespace-id"
-
-# CORS configuration
-[env.production]
+# Workers Custom Domain — wrangler provisions the proxied DNS record automatically.
 routes = [
-  {pattern = "lawn-buddy.workers.dev", zone_name = "workers.dev"}
+  { pattern = "lawnbuddy.kennyatx.com", custom_domain = true }
 ]
 
-[env.development]
-routes = []
+# D1 database for users, lawns, photos metadata, messages, notifications.
+# Create with: npx wrangler d1 create lawn-buddy-db
+# Then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "lawn-buddy-db"
+database_id = "23e0b2d4-836f-4980-8ef3-8395f1156ffe"
+migrations_dir = "migrations"
+
+# R2 bucket for lawn photos.
+# Create with: npx wrangler r2 bucket create lawn-buddy-photos
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "lawn-buddy-photos"
+
+# Static frontend (vanilla SPA, no build step).
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Outbound email via Cloudflare Email Routing.
+# Requires Email Routing enabled on a domain in your CF account, plus verified
+# destination addresses. EMAIL_FROM must be on your routing-enabled domain.
+[[send_email]]
+name = "EMAIL"
+
+# Public-facing vars. Secrets (LLM_PROVIDER_TOKEN, CF_AI_GATEWAY_TOKEN) set with `wrangler secret put`.
+[vars]
+CF_ACCOUNT_ID = "cf750f8c640ce29841b5bc38221ea13d"
+CF_AI_GATEWAY_ID = "lawn-buddy-ai-gateway"
+# LLM model for AI Gateway's /compat/chat/completions endpoint. Must be in
+# "<provider>/<model>" form. Examples:
+#   workers-ai/@cf/meta/llama-3.2-11b-vision-instruct
+#   anthropic/claude-sonnet-4-6
+#   openai/gpt-4o
+LLM_MODEL = "workers-ai/@cf/meta/llama-3.2-11b-vision-instruct"
+EMAIL_FROM = ""  # e.g. "lawn-buddy@yourdomain.com" — must be on a routing-enabled domain
+
+# Daily 13:00 UTC ≈ 9am ET — alerts cron.
+[triggers]
+crons = ["0 13 * * *"]

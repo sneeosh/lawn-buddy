@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lawn Buddy</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 28 C 9.5 22.5 8 14 16 4 C 24 14 22.5 22.5 16 28 Z" />
+          <path d="M16 9 V 28" />
+          <path d="M16 14.5 L 19.5 12.5" />
+          <path d="M16 14.5 L 12.5 12.5" />
+          <path d="M16 19 L 20 17" />
+          <path d="M16 19 L 12 17" />
+        </svg>
+      </span>
+      <span class="brand-name">Lawn <em>Buddy</em></span>
+      <span class="brand-tag">Field Almanac · No. 01</span>
+    </div>
+    <div></div>
+    <div class="user-info" id="user-info" hidden>
+      <span id="user-email"></span>
+      <button class="link" id="sign-out">sign out</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Screen: sign in -->
+    <section class="screen" id="screen-signin">
+      <div class="card">
+        <p class="kicker">An almanac for the patient gardener</p>
+        <h1>Welcome to <em>Lawn&nbsp;Buddy</em>.</h1>
+        <p class="lede">Tell us your email to begin. No password — your email is the key to your garden, and we keep your records in their own quiet folio.</p>
+        <form id="signin-form">
+          <label>Email
+            <input type="email" id="signin-email" required autofocus />
+          </label>
+          <button type="submit">Continue</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Screen: lawn list -->
+    <section class="screen" id="screen-lawns" hidden>
+      <div class="screen-header">
+        <h1>Your Lawns</h1>
+        <button id="btn-new-lawn">+ Add a lawn</button>
+      </div>
+      <div id="lawn-list" class="lawn-grid"></div>
+      <p id="lawn-empty" hidden>No plots in the ledger yet. Add one above to begin your record.</p>
+    </section>
+
+    <!-- Screen: onboarding -->
+    <section class="screen" id="screen-onboarding" hidden>
+      <div class="card">
+        <p class="kicker">A new entry</p>
+        <h1>Add a <em>lawn</em>.</h1>
+        <p class="lede">Tell us about your patch — the more detail, the better the guidance. Photos help most of all.</p>
+        <form id="onboarding-form">
+          <label>Lawn name
+            <input type="text" name="name" required placeholder="Front yard" />
+          </label>
+
+          <label>Region
+            <select name="climate_zone" id="zone-select" required>
+              <option value="">Select a region…</option>
+            </select>
+          </label>
+
+          <fieldset>
+            <legend>Lawn details</legend>
+            <label>Size (sq ft)
+              <div class="size-row">
+                <input type="number" name="size_sqft" id="size-input" min="1" required />
+                <button type="button" class="link" id="estimate-size-btn">Estimate from photos</button>
+              </div>
+              <p id="size-hint" class="muted" hidden></p>
+            </label>
+            <label>Sun exposure
+              <select name="sun_exposure" required>
+                <option value="full">Full sun</option>
+                <option value="partial">Partial</option>
+                <option value="shade">Shade</option>
+              </select>
+            </label>
+            <label>Irrigation
+              <select name="irrigation" required>
+                <option value="none">None</option>
+                <option value="hose">Hose & sprinkler</option>
+                <option value="in_ground">In-ground sprinklers</option>
+                <option value="drip">Drip</option>
+              </select>
+            </label>
+            <label>Mowing frequency
+              <select name="mowing_frequency" required>
+                <option value="weekly">Weekly</option>
+                <option value="bi_weekly">Every 2 weeks</option>
+                <option value="monthly">Monthly</option>
+                <option value="irregular">Irregular</option>
+              </select>
+            </label>
+
+            <label>Current issues (select all that apply)</label>
+            <div class="checkbox-group" id="issues-group">
+              <label><input type="checkbox" name="issue" value="bare_spots" /> Bare spots</label>
+              <label><input type="checkbox" name="issue" value="weeds" /> Weeds</label>
+              <label><input type="checkbox" name="issue" value="discoloration" /> Discoloration</label>
+              <label><input type="checkbox" name="issue" value="thinning" /> Thinning</label>
+              <label><input type="checkbox" name="issue" value="pests" /> Pests</label>
+              <label><input type="checkbox" name="issue" value="disease" /> Disease</label>
+              <label><input type="checkbox" name="issue" value="none" /> None / unsure</label>
+            </div>
+
+            <label>Notes (optional)
+              <textarea name="notes" rows="3" placeholder="Anything else worth knowing?"></textarea>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Photos (optional but recommended)</legend>
+            <input type="file" id="onboarding-photos" accept="image/*" multiple />
+            <p class="muted">Upload 1–4 photos of your lawn for the initial assessment.</p>
+          </fieldset>
+
+          <details>
+            <summary>Soil test results (optional)</summary>
+            <div class="soil-grid">
+              <label>pH<input type="number" step="0.1" name="soil_ph" /></label>
+              <label>N<input type="number" step="0.1" name="soil_n" /></label>
+              <label>P<input type="number" step="0.1" name="soil_p" /></label>
+              <label>K<input type="number" step="0.1" name="soil_k" /></label>
+              <label>Organic matter %<input type="number" step="0.1" name="soil_om_pct" /></label>
+              <label>CEC<input type="number" step="0.1" name="soil_cec" /></label>
+              <label>Ca<input type="number" step="0.1" name="soil_ca" /></label>
+              <label>Mg<input type="number" step="0.1" name="soil_mg" /></label>
+              <label>S<input type="number" step="0.1" name="soil_s" /></label>
+              <label>Fe<input type="number" step="0.1" name="soil_fe" /></label>
+              <label>Mn<input type="number" step="0.1" name="soil_mn" /></label>
+              <label>Zn<input type="number" step="0.1" name="soil_zn" /></label>
+              <label>Cu<input type="number" step="0.1" name="soil_cu" /></label>
+              <label>B<input type="number" step="0.1" name="soil_b" /></label>
+            </div>
+          </details>
+
+          <div class="form-actions">
+            <button type="button" class="link" id="onboarding-cancel">Cancel</button>
+            <button type="submit" id="onboarding-submit">Save & analyze</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Screen: lawn dashboard -->
+    <section class="screen" id="screen-lawn" hidden>
+      <div class="screen-header">
+        <button class="link" id="back-to-lawns">← All lawns</button>
+        <h1 id="lawn-title"></h1>
+        <button class="danger link" id="delete-lawn">Delete lawn</button>
+      </div>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="photos">Photos</button>
+        <button class="tab" data-tab="notifications">Notifications <span id="notif-badge" class="badge" hidden></span></button>
+        <button class="tab" data-tab="details">Details</button>
+      </nav>
+
+      <div class="tab-panel" id="tab-chat">
+        <div id="chat-thread" class="chat-thread"></div>
+        <form id="chat-form" class="chat-input">
+          <input type="file" id="chat-photo" accept="image/*" multiple />
+          <textarea id="chat-text" rows="2" placeholder="Ask the almanac about your lawn…"></textarea>
+          <button type="submit" id="chat-send">Send</button>
+        </form>
+        <p id="chat-thinking" class="muted" hidden>Consulting the almanac…</p>
+      </div>
+
+      <div class="tab-panel" id="tab-photos" hidden>
+        <div id="photo-grid" class="photo-grid"></div>
+        <p id="photo-empty" hidden>No photographs in the file yet.</p>
+      </div>
+
+      <div class="tab-panel" id="tab-notifications" hidden>
+        <div id="notification-list"></div>
+        <p id="notification-empty" hidden>No dispatches yet. Seasonal notices arrive when their time comes.</p>
+      </div>
+
+      <div class="tab-panel" id="tab-details" hidden>
+        <p class="kicker">Edit the entry</p>
+        <p class="lede">Update what you know about this patch. Saving will append a fresh almanac note to your chat that speaks to what changed.</p>
+        <form id="details-form">
+          <label>Lawn name
+            <input type="text" name="name" id="details-name" required />
+          </label>
+
+          <label>Region
+            <select name="climate_zone" id="details-zone-select" required>
+              <option value="">Select a region…</option>
+            </select>
+          </label>
+
+          <fieldset>
+            <legend>Lawn details</legend>
+            <label>Size (sq ft)
+              <input type="number" name="size_sqft" id="details-size-input" min="1" required />
+            </label>
+            <label>Sun exposure
+              <select name="sun_exposure" id="details-sun" required>
+                <option value="full">Full sun</option>
+                <option value="partial">Partial</option>
+                <option value="shade">Shade</option>
+              </select>
+            </label>
+            <label>Irrigation
+              <select name="irrigation" id="details-irrigation" required>
+                <option value="none">None</option>
+                <option value="hose">Hose & sprinkler</option>
+                <option value="in_ground">In-ground sprinklers</option>
+                <option value="drip">Drip</option>
+              </select>
+            </label>
+            <label>Mowing frequency
+              <select name="mowing_frequency" id="details-mowing" required>
+                <option value="weekly">Weekly</option>
+                <option value="bi_weekly">Every 2 weeks</option>
+                <option value="monthly">Monthly</option>
+                <option value="irregular">Irregular</option>
+              </select>
+            </label>
+
+            <label>Current issues (select all that apply)</label>
+            <div class="checkbox-group" id="details-issues-group">
+              <label><input type="checkbox" name="issue" value="bare_spots" /> Bare spots</label>
+              <label><input type="checkbox" name="issue" value="weeds" /> Weeds</label>
+              <label><input type="checkbox" name="issue" value="discoloration" /> Discoloration</label>
+              <label><input type="checkbox" name="issue" value="thinning" /> Thinning</label>
+              <label><input type="checkbox" name="issue" value="pests" /> Pests</label>
+              <label><input type="checkbox" name="issue" value="disease" /> Disease</label>
+              <label><input type="checkbox" name="issue" value="none" /> None / unsure</label>
+            </div>
+
+            <label>Notes (optional)
+              <textarea name="notes" id="details-notes" rows="3" placeholder="Anything else worth knowing?"></textarea>
+            </label>
+          </fieldset>
+
+          <details>
+            <summary>Soil test results (optional)</summary>
+            <div class="soil-grid">
+              <label>pH<input type="number" step="0.1" name="soil_ph" /></label>
+              <label>N<input type="number" step="0.1" name="soil_n" /></label>
+              <label>P<input type="number" step="0.1" name="soil_p" /></label>
+              <label>K<input type="number" step="0.1" name="soil_k" /></label>
+              <label>Organic matter %<input type="number" step="0.1" name="soil_om_pct" /></label>
+              <label>CEC<input type="number" step="0.1" name="soil_cec" /></label>
+              <label>Ca<input type="number" step="0.1" name="soil_ca" /></label>
+              <label>Mg<input type="number" step="0.1" name="soil_mg" /></label>
+              <label>S<input type="number" step="0.1" name="soil_s" /></label>
+              <label>Fe<input type="number" step="0.1" name="soil_fe" /></label>
+              <label>Mn<input type="number" step="0.1" name="soil_mn" /></label>
+              <label>Zn<input type="number" step="0.1" name="soil_zn" /></label>
+              <label>Cu<input type="number" step="0.1" name="soil_cu" /></label>
+              <label>B<input type="number" step="0.1" name="soil_b" /></label>
+            </div>
+          </details>
+
+          <div class="form-actions">
+            <span id="details-status" class="muted" hidden></span>
+            <button type="submit" id="details-submit">Save & re-analyze</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>Lawn Buddy gives general guidance based on your inputs. It is not a licensed professional. Always read product labels and follow local regulations.</small>
+  </footer>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
