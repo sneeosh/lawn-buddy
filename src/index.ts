@@ -30,7 +30,15 @@ app.route('/api/lawns', notifications);
 app.route('/api/estimate-size', estimate);
 app.route('/api/admin', admin);
 
-app.notFound((c) => c.json({ error: 'not found' }, 404));
+// API routes return JSON; everything else falls through to static assets so
+// extensionless paths (e.g. /admin → public/admin.html) resolve via the
+// ASSETS binding's built-in html_handling.
+app.notFound(async (c) => {
+  if (c.req.path.startsWith('/api/')) {
+    return c.json({ error: 'not found' }, 404);
+  }
+  return c.env.ASSETS.fetch(c.req.raw);
+});
 app.onError((err, c) => {
   console.error('unhandled error:', err);
   return c.json({ error: err.message ?? 'internal error' }, 500);
