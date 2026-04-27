@@ -2,6 +2,10 @@ name = "lawn-buddy"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+# Custom domain only — no <name>.<sub>.workers.dev URL. The admin route
+# trusts a header that Cloudflare Access injects at the edge; allowing
+# the worker to be reachable on workers.dev would let anyone spoof it.
+workers_dev = false
 
 # Workers Custom Domain — wrangler provisions the proxied DNS record automatically.
 routes = [

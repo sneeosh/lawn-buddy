@@ -33,7 +33,9 @@ Browser ──┐
           ├─ /api/lawns/:id/assessment → first-pass + reassessment after intake edit
           ├─ /api/lawns/:id/photos   → R2 blob upload + thumbnails
           ├─ /api/lawns/:id/notifications → { upcoming, recent }
-          └─ /api/zones, /api/estimate-size
+          ├─ /api/zones, /api/estimate-size
+          └─ /api/admin/stats         → engagement totals + signups
+                                        (gated by Cloudflare Access, not requireUser)
 
    Daily cron (src/lib/cron.ts):
           1. Weather forecast per zone
@@ -44,7 +46,8 @@ Browser ──┐
 
 ### Key design choices
 
-- **No password auth.** Email is the account; `device_id` (UUID stored in `localStorage`) blocks impersonation of an existing email. New emails auto-claim. Behind `Cloudflare Access` is the way to gate access if needed.
+- **No password auth.** Email is the account; `device_id` (UUID stored in `localStorage`) blocks impersonation of an existing email. New emails auto-claim. The `/admin` analytics page is separately gated by a Cloudflare Access self-hosted app — the Worker just trusts the `Cf-Access-Authenticated-User-Email` header that Access injects, and `workers_dev = false` keeps the only path through Access.
+- **Photo discipline at upload.** iPhone photos can be 5–12 MB HEIC, which the vision model can't decode. The SPA re-encodes every image through a canvas to JPEG (max 2048 px, q 0.85, with quality/dimension fallback) before upload, so the server never sees HEIC and never has to handle multi-megabyte uploads.
 - **History sanitization.** Disclaimers appended by the platform are stripped from assistant messages before they're fed back to the LLM as context. Otherwise the model copies the pattern and emits its own duplicate disclaimer.
 - **Date awareness.** `buildSystemPrompt` injects today's date so the LLM doesn't guess the month.
 - **Photo discipline.** System prompt explicitly forbids referencing photos that aren't attached. The initial-assessment prompt is built dynamically from the actual onboarding photo count.
