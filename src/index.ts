@@ -9,6 +9,7 @@ import messages from './routes/messages';
 import assessment from './routes/assessment';
 import notifications from './routes/notifications';
 import estimate from './routes/estimate';
+import admin from './routes/admin';
 import { runDailyCron } from './lib/cron';
 
 const app = new Hono<AppContext>();
@@ -27,6 +28,7 @@ app.route('/api/lawns', messages);
 app.route('/api/lawns', assessment);
 app.route('/api/lawns', notifications);
 app.route('/api/estimate-size', estimate);
+app.route('/api/admin', admin);
 
 app.notFound((c) => c.json({ error: 'not found' }, 404));
 app.onError((err, c) => {

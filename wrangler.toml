@@ -45,6 +45,7 @@ CF_AI_GATEWAY_ID = "lawn-buddy-ai-gateway"
 #   openai/gpt-4o
 LLM_MODEL = "workers-ai/@cf/meta/llama-3.2-11b-vision-instruct"
 EMAIL_FROM = ""  # e.g. "lawn-buddy@yourdomain.com" — must be on a routing-enabled domain
+# /admin and /api/admin/* are gated by a Cloudflare Access app, not env vars.
 
 # Daily 13:00 UTC ≈ 9am ET — alerts cron.
 [triggers]

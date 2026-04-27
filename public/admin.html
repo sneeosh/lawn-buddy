@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lawn Buddy — Admin</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .admin-wrap { max-width: 880px; margin: 0 auto; padding: 32px 24px 80px; }
+    .admin-wrap h1 {
+      font-family: var(--display);
+      font-weight: 500;
+      font-size: 2rem;
+      margin: 0 0 0.25rem;
+      letter-spacing: -0.01em;
+    }
+    .admin-wrap .lede {
+      color: var(--faded);
+      font-style: italic;
+      margin: 0 0 2rem;
+    }
+    .admin-totals {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 2.5rem;
+    }
+    .admin-totals .cell {
+      background: var(--surface);
+      padding: 1rem 1.1rem;
+    }
+    .admin-totals .label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--faded);
+      margin: 0 0 0.35rem;
+    }
+    .admin-totals .value {
+      font-family: var(--display);
+      font-weight: 500;
+      font-size: 1.6rem;
+      color: var(--ink);
+    }
+    h2 {
+      font-family: var(--display);
+      font-weight: 500;
+      font-size: 1.25rem;
+      margin: 0 0 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+    thead th {
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--faded);
+      border-bottom: 1px solid var(--rule);
+      padding: 0.5rem 0.6rem;
+      font-weight: 500;
+    }
+    tbody td {
+      padding: 0.55rem 0.6rem;
+      border-bottom: 1px solid var(--rule-soft);
+      vertical-align: top;
+    }
+    tbody td.num { font-variant-numeric: tabular-nums; text-align: right; }
+    tbody td.email { font-family: var(--mono); font-size: 0.85rem; }
+    .muted { color: var(--faded); }
+    .empty { color: var(--faded); padding: 2rem 0; text-align: center; font-style: italic; }
+    .error {
+      background: rgba(169, 54, 18, 0.08);
+      border: 1px solid var(--ember);
+      color: var(--ember);
+      padding: 1rem;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="admin-wrap">
+    <h1>Lawn Buddy — Admin</h1>
+    <p class="lede">Engagement totals and signups.</p>
+
+    <div id="error" class="error" hidden></div>
+
+    <section id="totals-section" hidden>
+      <div class="admin-totals" id="totals"></div>
+    </section>
+
+    <section id="users-section" hidden>
+      <h2>Signups</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Joined</th>
+            <th class="num">Lawns</th>
+            <th class="num">Photos</th>
+            <th class="num">Messages</th>
+            <th>Last active</th>
+          </tr>
+        </thead>
+        <tbody id="users-body"></tbody>
+      </table>
+      <div id="users-empty" class="empty" hidden>No signups yet.</div>
+    </section>
+  </main>
+
+  <script type="module">
+    // Auth happens at the edge via Cloudflare Access — the CF_Authorization
+    // cookie rides along on same-origin fetches automatically.
+
+    const TOTAL_LABELS = [
+      ['users',              'Users'],
+      ['lawns',              'Lawns'],
+      ['photos',             'Photos'],
+      ['messages',           'Messages'],
+      ['user_messages',      'User msgs'],
+      ['assistant_messages', 'AI msgs'],
+      ['notifications',      'Notifications'],
+    ];
+
+    function fmtDate(secs) {
+      if (!secs) return '—';
+      return new Date(secs * 1000).toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+      });
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.hidden = false;
+    }
+
+    async function load() {
+      let res;
+      try {
+        res = await fetch('/api/admin/stats');
+      } catch (err) {
+        showError(`Network error: ${err.message}`);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error || `HTTP ${res.status}`);
+        return;
+      }
+
+      const totalsEl = document.getElementById('totals');
+      for (const [key, label] of TOTAL_LABELS) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const l = document.createElement('div');
+        l.className = 'label';
+        l.textContent = label;
+        const v = document.createElement('div');
+        v.className = 'value';
+        v.textContent = (data.totals?.[key] ?? 0).toLocaleString();
+        cell.append(l, v);
+        totalsEl.appendChild(cell);
+      }
+      document.getElementById('totals-section').hidden = false;
+
+      const tbody = document.getElementById('users-body');
+      const users = data.users || [];
+      if (!users.length) {
+        document.getElementById('users-empty').hidden = false;
+      } else {
+        for (const u of users) {
+          const tr = document.createElement('tr');
+          const cells = [
+            { text: u.email, cls: 'email' },
+            { text: fmtDate(u.created_at) },
+            { text: (u.lawn_count ?? 0).toLocaleString(), cls: 'num' },
+            { text: (u.photo_count ?? 0).toLocaleString(), cls: 'num' },
+            { text: (u.message_count ?? 0).toLocaleString(), cls: 'num' },
+            { text: u.last_message_at ? fmtDate(u.last_message_at) : '—',
+              cls: u.last_message_at ? '' : 'muted' },
+          ];
+          for (const c of cells) {
+            const td = document.createElement('td');
+            if (c.cls) td.className = c.cls;
+            td.textContent = c.text;
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+      }
+      document.getElementById('users-section').hidden = false;
+    }
+
+    load();
+  </script>
+</body>
+</html>
