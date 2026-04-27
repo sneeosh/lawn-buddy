@@ -8,7 +8,10 @@ const photos = new Hono<AppContext>();
 photos.use('*', requireUser);
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB per photo
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+// HEIC/HEIF are intentionally excluded: the vision model can't decode them,
+// so accepting them here would silently drop the photo from inference. The
+// SPA transcodes everything (including iPhone HEIC) to JPEG before upload.
+const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 async function lawnOwnedByUser(c: Context<AppContext>, lawnId: string): Promise<LawnRow | null> {
   return c.env.DB.prepare('SELECT * FROM lawns WHERE id = ? AND user_email = ?')

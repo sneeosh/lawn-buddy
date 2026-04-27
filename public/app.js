@@ -23,6 +23,69 @@ const state = {
   zones: [],
 };
 
+// ---------- Image compression ----------
+// iPhones produce 5–12 MB HEIC/JPEG straight from the camera. We re-encode
+// every image to JPEG and cap the longest side, so the upload fits under the
+// 8 MB server limit and HEIC never reaches the worker (the LLM's vision path
+// can't decode it).
+
+const MAX_IMAGE_DIM = 2048;
+const JPEG_QUALITY = 0.85;
+
+async function loadBitmap(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      // Fall through to <img> path. Older Safari can't createImageBitmap
+      // from HEIC, but it can decode HEIC into an <img> element.
+    }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('image decode failed'));
+      el.src = url;
+    });
+    return img;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function compressImage(file) {
+  if (!file.type.startsWith('image/')) return file;
+  let bitmap;
+  try {
+    bitmap = await loadBitmap(file);
+  } catch {
+    return file; // let the server reject if it's truly unreadable
+  }
+  const srcW = bitmap.width || bitmap.naturalWidth;
+  const srcH = bitmap.height || bitmap.naturalHeight;
+  if (!srcW || !srcH) return file;
+
+  const scale = Math.min(1, MAX_IMAGE_DIM / Math.max(srcW, srcH));
+  const w = Math.round(srcW * scale);
+  const h = Math.round(srcH * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  if (typeof bitmap.close === 'function') bitmap.close();
+
+  const blob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY)
+  );
+  if (!blob) return file;
+  const baseName = file.name.replace(/\.[^.]+$/, '') || 'photo';
+  return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+}
+
 // ---------- API helpers ----------
 
 function api(path, opts = {}) {
@@ -160,7 +223,7 @@ $('#estimate-size-btn').addEventListener('click', async () => {
   hint.hidden = true;
   try {
     const fd = new FormData();
-    for (const f of files) fd.append('file', f);
+    for (const f of files) fd.append('file', await compressImage(f));
     const res = await api('/api/estimate-size', { method: 'POST', body: fd });
     $('#size-input').value = res.size_sqft;
     hint.hidden = false;
@@ -210,7 +273,7 @@ $('#onboarding-form').addEventListener('submit', async (e) => {
     const photoFiles = Array.from($('#onboarding-photos').files);
     for (const file of photoFiles) {
       const pf = new FormData();
-      pf.append('file', file);
+      pf.append('file', await compressImage(file));
       pf.append('source', 'onboarding');
       await api(`/api/lawns/${lawn.id}/photos`, { method: 'POST', body: pf });
     }
@@ -421,7 +484,7 @@ $('#chat-form').addEventListener('submit', async (e) => {
     const photoIds = [];
     for (const file of files) {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', await compressImage(file));
       fd.append('source', 'chat');
       const { photo } = await api(`/api/lawns/${state.currentLawnId}/photos`, { method: 'POST', body: fd });
       photoIds.push(photo.id);
