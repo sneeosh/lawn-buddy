@@ -55,35 +55,53 @@ async function loadBitmap(file) {
   }
 }
 
+// Server cap is 8 MB; we target a comfortably-under threshold and step the
+// JPEG quality / dimensions down if a high-megapixel iPhone shot still
+// re-encodes too large. Throwing — rather than passing the raw file through
+// — guarantees the user sees a clear client-side error instead of the
+// server's opaque 413/415.
+const MAX_OUTPUT_BYTES = 7 * 1024 * 1024;
+const QUALITY_STEPS = [0.85, 0.7, 0.55];
+
 async function compressImage(file) {
-  if (!file.type.startsWith('image/')) return file;
+  if (!file.type.startsWith('image/')) {
+    throw new Error(`unexpected file type: ${file.type || 'unknown'}`);
+  }
   let bitmap;
   try {
     bitmap = await loadBitmap(file);
   } catch {
-    return file; // let the server reject if it's truly unreadable
+    throw new Error(`couldn't read ${file.name || 'image'} — try a JPEG or PNG`);
   }
   const srcW = bitmap.width || bitmap.naturalWidth;
   const srcH = bitmap.height || bitmap.naturalHeight;
-  if (!srcW || !srcH) return file;
+  if (!srcW || !srcH) {
+    throw new Error(`couldn't read ${file.name || 'image'} dimensions`);
+  }
 
-  const scale = Math.min(1, MAX_IMAGE_DIM / Math.max(srcW, srcH));
-  const w = Math.round(srcW * scale);
-  const h = Math.round(srcH * scale);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(bitmap, 0, 0, w, h);
+  let maxDim = MAX_IMAGE_DIM;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+    const w = Math.round(srcW * scale);
+    const h = Math.round(srcH * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const quality = QUALITY_STEPS[Math.min(attempt, QUALITY_STEPS.length - 1)];
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', quality)
+    );
+    if (blob && blob.size <= MAX_OUTPUT_BYTES) {
+      if (typeof bitmap.close === 'function') bitmap.close();
+      const baseName = (file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo';
+      return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+    }
+    maxDim = Math.round(maxDim * 0.75); // shrink and retry
+  }
   if (typeof bitmap.close === 'function') bitmap.close();
-
-  const blob = await new Promise((resolve) =>
-    canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY)
-  );
-  if (!blob) return file;
-  const baseName = file.name.replace(/\.[^.]+$/, '') || 'photo';
-  return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+  throw new Error('photo is too large even after compression — please try a smaller one');
 }
 
 // ---------- API helpers ----------
